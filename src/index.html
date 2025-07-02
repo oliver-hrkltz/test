@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCV.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <table>
+        <tr>
+            <th>Input</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td><video id="video" autoplay playsinline muted></video></td>
+            <td><canvas id="canvas"></canvas></td>
+        </tr>
+    </table>
+    <script async src="opencv.js" onload="onOpenCvReady()" type="text/javascript"></script>
+</body>
+<script>
+    const videoElement = document.getElementById('video');
+    const statusDiv = document.getElementById('status');
+    let streaming = false;
+    let src = null, dst = null;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    // Access camera
+    async function startCamera() {
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            console.error('Camera API not supported on this device/browser.');
+            return;
+        }
+
+        try {
+            const constraints = {
+                video: true,
+                audio: false
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoElement.srcObject = stream;
+            videoElement.onloadedmetadata = () => {
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+            };
+        } catch (err) {
+            console.error('Camera error:', err);
+        }
+    }
+
+    function processFrame(cvInstance) {
+        if (!streaming) return;
+
+        // FPS calculation
+        frameCount++;
+        const now = performance.now();
+        if (now - lastTime >= 1000) {
+            fps = frameCount;
+            frameCount = 0;
+            lastTime = now;
+        }
+        
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // TODO: Place analysis code here.
+
+        // No grayscale: just put the original image back
+        ctx.putImageData(imageData, 0, 0);
+
+        // Draw FPS on top left
+        ctx.font = '24px sans-serif';
+        ctx.fillStyle = 'yellow';
+        ctx.fillText('FPS: ' + fps, 10, 30);
+
+        // Next frame
+        requestAnimationFrame(() => processFrame(cvInstance));
+    }
+
+
+    async function onOpenCvReady() {
+        cv = (cv instanceof Promise) ? await cv : cv;
+        console.log(' OpenCV.js is ready.', cv.getBuildInformation());
+        // Support both Promise and classic cv
+        if (typeof cv === 'object' && cv.getBuildInformation) {
+            setupOpenCV(cv);
+        } else {
+            console.warn('cv is not available or not recognized.');
+        }
+    }
+
+
+    function setupOpenCV(cvInstance) {
+        // Prepare Mats after video is ready
+        video.addEventListener('play', () => {
+            streaming = true;
+            processFrame(cvInstance);
+        });
+    }
+
+
+    startCamera();
+    window.onOpenCvReady = onOpenCvReady;
+</script>
+</html>
